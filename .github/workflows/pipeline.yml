@@ -1,0 +1,40 @@
+name: pipeline
+on: [pull_request] # Support only pull_request event.
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ['14.x']
+        
+  nodejs:
+    name: runner / suggester / gofmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          check-latest: true
+      - name: Install Node Dependencies
+        run: npm install
+        env:
+          CI: true
+      - name: Test Code Linting
+        run: npm install solhint && ./node_modules/.bin/solhint --init
+      - name: Save Code Linting Report JSON
+        run: ./node_modules/.bin/solhint contracts/**/*.sol -f json > solhint_report.json
+        # Continue to the next step even if this fails
+        continue-on-error: true
+      - name: Annotate Code Linting Results
+        uses: ataylorme/eslint-annotate-action@1.1.2
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          report-json: "solhint_report.json"
+      - name: Upload SolHint report
+        uses: actions/upload-artifact@v1
+        with:
+          name: solhint_report.json
+          path: solhint_report.json
